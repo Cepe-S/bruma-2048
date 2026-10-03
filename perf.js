@@ -1,5 +1,7 @@
 /** Lightweight performance overlay — measures only while open. */
 
+import { getRefreshHz, hzFromFrameDeltas } from "./refresh.js";
+
 const OPEN_KEY = "bruma-2048-perf-open";
 const GRAPH_LEN = 60;
 const JANK_MS = 50;
@@ -35,6 +37,7 @@ export function createPerfPanel({ getCanvasInfo } = {}) {
   const jankEl = document.getElementById("perf-jank");
   const memEl = document.getElementById("perf-mem");
   const dprEl = document.getElementById("perf-dpr");
+  const hzEl = document.getElementById("perf-hz");
   const canvasEl = document.getElementById("perf-canvas");
   const graphEl = document.getElementById("perf-graph");
 
@@ -80,8 +83,17 @@ export function createPerfPanel({ getCanvasInfo } = {}) {
     ctx.stroke();
   }
 
+  function refreshHzEstimate() {
+    const boot = getRefreshHz();
+    const live = hzFromFrameDeltas(graph);
+    const hz = live > 0 ? live : boot;
+    if (hzEl) hzEl.textContent = hz > 0 ? `${hz} Hz` : "—";
+    return hz;
+  }
+
   function refreshStatic() {
     if (dprEl) dprEl.textContent = String(window.devicePixelRatio || 1);
+    refreshHzEstimate();
     const info = getCanvasInfo?.();
     if (canvasEl && info?.canvases?.length) {
       canvasEl.textContent = info.canvases
@@ -102,6 +114,7 @@ export function createPerfPanel({ getCanvasInfo } = {}) {
     if (frameEl) frameEl.textContent = lastDt ? `${lastDt.toFixed(1)} ms` : "—";
     if (worstEl) worstEl.textContent = worst ? `${worst.toFixed(1)} ms` : "—";
     if (jankEl) jankEl.textContent = String(jank);
+    refreshHzEstimate();
     drawGraph();
   }
 

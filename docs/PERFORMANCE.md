@@ -84,7 +84,7 @@ El contexto menciona `arrow-flight.png` y `combo-start.png` (~1,4 MB). **No est�
 2. Compará **FPS** y **prom** antes/después de cambiar Calidad en el menú.
 3. **Frame** = último frame; **Peor** = peor frame reciente; **>50 ms** cuenta frames largos (jank).
 4. **Mem** aparece solo en Chromium (`performance.memory`).
-5. **DPR** y **Canvas** muestran ratio de píxeles y tamaño del buffer WebGL.
+5. **DPR**, **Refresco** (Hz estimado por intervalos rAF) y **Canvas** muestran ratio de píxeles y tamaño del buffer WebGL.
 6. El mini gráfico registra los últimos ~60 frames (ms por frame).
 
 El panel **no mide** cuando está cerrado, para no sumar overhead.
@@ -93,8 +93,22 @@ El panel **no mide** cuando está cerrado, para no sumar overhead.
 
 | Modo | Comportamiento |
 |------|----------------|
-| **Alta** | WebGL a DPR limitado (máx. 2), ~30 FPS, efectos completos |
-| **Baja** | DPR 1, ~20 FPS, mesh más simple, sin blur/grano/backdrop |
-| **Auto** | Empieza en Alta; si FPS promedio < 45 sostenido 2 s, baja a perfil reducido (persistido como auto+degradado) |
+| **Alta** | WebGL ~30 FPS; fichas con rAF nativo (90/120 Hz); efectos completos |
+| **Baja** | DPR 1, WebGL ~20 FPS, CSS transition + setTimeout, sin blur/grano/backdrop |
+| **Auto** | Empieza en Alta; si FPS < 55 % del refresco detectado (mín. 30) durante 2 s, baja |
 
 Preferencia guardada en `localStorage` (`bruma-2048-quality`).
+
+## Tasa de refresco (90 / 120 Hz)
+
+### Qué limitaba a ~60 FPS
+
+1. **Deslizamiento con `transition: transform 150ms` + `setTimeout(150)`** — el turno quedaba atado a temporizadores, no al display.
+2. **`targetFps` del WebGL** — solo limita redraws del shader; el movimiento del tablero ahora va por otro camino en Alta/Auto.
+3. **`skipEveryOtherFrame` del vendor** — sin `targetFps`, en 120 Hz el gradiente dibuja ~60 FPS (cada segundo frame).
+
+### Cambios (Alta / Auto sin degradar)
+
+- **`nativeMotion`**: fichas con `requestAnimationFrame` + delta-time (`motion.js`); sin transition en `--r`/`--c`.
+- **Baja**: sigue con CSS + `setTimeout` (menos CPU).
+- **Auto-degradación**: umbral relativo al refresco medido al arrancar (`refresh.js`).

@@ -1,11 +1,12 @@
 /** Visual quality presets for mobile performance. */
 
+import { autoDegradeThreshold, getRefreshHz } from "./refresh.js";
+
 export const QUALITY_KEY = "bruma-2048-quality";
 export const QUALITY_DEGRADED_KEY = "bruma-2048-quality-degraded";
 
 export const MODES = ["high", "low", "auto"];
 
-const AUTO_FPS_THRESHOLD = 45;
 const AUTO_SAMPLE_MS = 2000;
 const AUTO_RECHECK_MS = 30000;
 
@@ -64,8 +65,11 @@ export function qualityProfile(mode, degraded = readDegradedFlag()) {
     tier,
     mode,
     degraded,
-    pixelRatio: low ? 1 : Math.min(dpr, 2),
+    /** Game tile slides: rAF + delta-time at display rate (not capped at 60). */
+    nativeMotion: !low,
+    /** WebGL background only — does not limit UI or tile motion. */
     targetFps: low ? 20 : 30,
+    pixelRatio: low ? 1 : Math.min(dpr, 2),
     maxSegments: low ? 10 : undefined,
     mistBlurMax: low ? 0 : 22,
     grain: !low,
@@ -78,6 +82,7 @@ export function qualityProfile(mode, degraded = readDegradedFlag()) {
 
 export function applyQualityClass(profile) {
   document.body.classList.toggle("is-quality-low", profile.tier === "low");
+  document.body.classList.toggle("is-native-motion", Boolean(profile.nativeMotion));
   document.body.dataset.quality = profile.mode;
   document.body.dataset.qualityTier = profile.tier;
 }
@@ -109,7 +114,8 @@ export function createAutoDegrader({ getMode, onDegrade }) {
     const elapsed = performance.now() - sampleStart;
     if (elapsed < AUTO_SAMPLE_MS * 0.9) return;
     const fps = (frames * 1000) / elapsed;
-    if (fps < AUTO_FPS_THRESHOLD) {
+    const threshold = autoDegradeThreshold(getRefreshHz());
+    if (fps < threshold) {
       persistDegradedFlag(true);
       onDegrade?.();
     }
