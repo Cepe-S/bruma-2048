@@ -1,0 +1,13 @@
+{
+  "name": "bruma-2048",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "node --test engine.test.js save-text.test.js combo.test.js tetris-engine.test.js snake-engine.test.js jet-engine.test.js",
+    "start": "python -m http.server 47261",
+    "music:build": "python scripts/build-playlist.py"
+  },
+  "dependencies": {
+    "@mesh-gradient/core": "^2.0.2"
+  }
+}

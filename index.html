@@ -1,0 +1,240 @@
+<!DOCTYPE html>
+<html lang="es-AR">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="theme-color" content="#081014" />
+    <meta name="description" content="Bruma: un 2048 original. Deslizá, combiná y llegá a 2048." />
+    <title>Bruma — 2048</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,560;9..144,720&family=Outfit:wght@400;500;600;700&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='16' fill='%230c1c1c'/%3E%3Ctext x='32' y='42' text-anchor='middle' font-size='22' font-family='Georgia' fill='%23e7f2ee'%3E2048%3C/text%3E%3C/svg%3E" />
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <div class="sky" aria-hidden="true">
+      <div class="bruma-shift" id="bruma-shift">
+        <canvas id="bruma-bg" class="bruma-bg"></canvas>
+      </div>
+      <span class="grain"></span>
+    </div>
+
+    <button
+      type="button"
+      class="menu-open"
+      id="menu-open"
+      aria-label="Menú"
+      aria-expanded="false"
+      aria-controls="drawer"
+    >
+      <span class="menu-lines" aria-hidden="true"><i></i><i></i><i></i></span>
+    </button>
+
+    <main class="play">
+      <h1 class="sr-only">Bruma</h1>
+      <div class="play-column">
+        <header class="meters">
+          <div class="meter">
+            <span>movimientos</span>
+            <strong id="moves">0</strong>
+          </div>
+          <div class="meter meter--score">
+            <span>puntaje</span>
+            <strong id="score">0</strong>
+            <em class="score-pop" id="score-pop" aria-hidden="true"></em>
+          </div>
+        </header>
+
+        <section class="stage" aria-label="Tablero de Bruma">
+          <p class="combo" id="combo" role="status" aria-live="polite" data-state="idle" data-count="0" data-gained="0" data-dirs="" hidden>
+            <span class="combo-figure" id="combo-figure">
+              <strong id="combo-count"></strong>
+              <span class="combo-label">combo</span>
+            </span>
+            <span class="combo-dirs" id="combo-dirs" aria-hidden="true"></span>
+          </p>
+          <div class="board" id="board" data-size="4">
+            <div class="grid" id="grid"></div>
+            <div class="tiles" id="tiles" aria-live="polite"></div>
+            <div class="burst" id="burst" hidden></div>
+          </div>
+        </section>
+      </div>
+    </main>
+
+    <div class="drawer" id="drawer" aria-hidden="true">
+      <div class="drawer-scrim" id="drawer-scrim"></div>
+      <aside class="drawer-panel" role="dialog" aria-modal="true" aria-labelledby="drawer-title" inert>
+        <header class="drawer-head">
+          <div>
+            <p class="eyebrow" id="eyebrow">rompecabezas · 4×4</p>
+            <h2 id="drawer-title">bruma</h2>
+          </div>
+          <button type="button" class="drawer-close" id="drawer-close" aria-label="Cerrar menú">
+            <svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true">
+              <path d="M3.2 3.2 L12.8 12.8 M12.8 3.2 L3.2 12.8" />
+            </svg>
+          </button>
+        </header>
+
+        <p class="drawer-best">
+          <span>mejor</span>
+          <strong id="best">0</strong>
+        </p>
+
+        <div class="drawer-body">
+          <section class="drawer-section">
+            <h3>Partida</h3>
+            <button type="button" class="drawer-action" id="new-game">
+              <span>Nueva partida</span>
+              <small>Empieza de cero. El mejor puntaje se queda.</small>
+            </button>
+            <button type="button" class="drawer-action" id="undo" disabled>
+              <span>Deshacer</span>
+              <small>Vuelve al movimiento anterior.</small>
+            </button>
+          </section>
+
+          <section class="drawer-section">
+            <h3>Tablero</h3>
+            <p class="drawer-lead">Cada tamaño guarda su propia partida.</p>
+            <div class="seg" id="size-switch" role="group" aria-label="Tamaño del tablero">
+              <button type="button" class="seg-btn" data-size="4" aria-pressed="true">4×4</button>
+              <button type="button" class="seg-btn" data-size="5" aria-pressed="false">5×5</button>
+              <button type="button" class="seg-btn" data-size="6" aria-pressed="false">6×6</button>
+              <button type="button" class="seg-btn" data-size="7" aria-pressed="false">7×7</button>
+            </div>
+          </section>
+
+          <section class="drawer-section">
+            <h3>Archivo</h3>
+            <button type="button" class="drawer-action" id="save-game">
+              <span>Guardar</span>
+              <small>Baja un archivo de texto para el Bloc de notas.</small>
+            </button>
+            <button type="button" class="drawer-action" id="load-game">
+              <span>Cargar</span>
+              <small>Abre ese archivo, o editalo y aplicalo.</small>
+            </button>
+            <p class="save-status" id="save-status" role="status" hidden></p>
+          </section>
+
+          <section class="drawer-section">
+            <h3>Audio</h3>
+            <button type="button" class="toggle" id="music-toggle" aria-pressed="true">Música: sí</button>
+            <p class="drawer-lead">Playlist en aleatorio, todo el tiempo.</p>
+          </section>
+
+          <section class="drawer-section">
+            <h3>Mando</h3>
+            <button type="button" class="toggle" id="rumble" aria-pressed="true">Vibración: sí</button>
+            <p class="drawer-lead">Vibra al unir 512 o más.</p>
+          </section>
+        </div>
+
+        <p class="drawer-note">
+          Flechas, WASD, el dedo o un mando. Las iguales se unen una sola vez.
+          La partida queda en este navegador.
+        </p>
+      </aside>
+    </div>
+
+    <div class="veil" id="overlay" hidden>
+      <div class="veil-copy" role="dialog" aria-modal="true" aria-labelledby="overlay-title">
+        <h2 id="overlay-title"></h2>
+        <p id="overlay-text"></p>
+        <div class="veil-actions">
+          <button type="button" class="veil-choice" id="overlay-continue">Seguí jugando</button>
+          <button type="button" class="veil-choice is-main" id="overlay-new">Nueva partida</button>
+        </div>
+      </div>
+    </div>
+
+    <dialog class="save-dialog" id="save-dialog" aria-labelledby="save-dialog-title">
+      <form method="dialog" class="save-dialog-card">
+        <h2 id="save-dialog-title">Cargar partida</h2>
+        <p>
+          Cada línea del tablero es una fila. Un punto (<code>.</code>) es una casilla vacía.
+          Los números son 2, 4, 8, 16 y así. Editalo acá o en el Bloc de notas, y tocá Aplicar.
+        </p>
+        <textarea id="save-text" spellcheck="false" autocomplete="off" aria-label="Texto de la partida"></textarea>
+        <p class="save-msg" id="save-dialog-msg" role="status"></p>
+        <div class="overlay-actions">
+          <button type="button" class="btn btn-ghost" id="save-browse">Abrir archivo</button>
+          <button type="button" class="btn btn-ghost" id="save-download">Descargar</button>
+          <button type="submit" class="btn btn-ghost">Cerrar</button>
+          <button type="button" class="btn btn-primary" id="save-apply">Aplicar</button>
+        </div>
+      </form>
+    </dialog>
+    <input id="save-file" type="file" accept=".txt,text/plain" hidden />
+
+    <aside class="now-playing" id="now-playing" aria-label="Música en reproducción">
+      <div class="now-playing-card">
+        <img class="now-playing-cover" id="now-playing-cover" alt="" width="48" height="48" />
+        <div class="now-playing-meta">
+          <p class="now-playing-title" id="now-playing-title">—</p>
+          <p class="now-playing-artist" id="now-playing-artist">—</p>
+        </div>
+        <div class="now-playing-transport">
+          <button type="button" class="player-btn" id="music-prev" aria-label="Retroceder">
+            <svg viewBox="0 0 16 16" width="15" height="15" aria-hidden="true">
+              <path d="M13 3.2 L6.2 8 L13 12.8 Z" />
+              <path d="M5.2 3.2 V12.8" />
+            </svg>
+          </button>
+          <button type="button" class="player-btn player-btn--pause" id="music-pause" aria-label="Pausa" aria-pressed="true">
+            <svg class="icon-pause" viewBox="0 0 16 16" width="15" height="15" aria-hidden="true">
+              <path d="M5.2 3.2 V12.8" />
+              <path d="M10.8 3.2 V12.8" />
+            </svg>
+            <svg class="icon-play" viewBox="0 0 16 16" width="15" height="15" aria-hidden="true">
+              <path d="M4.6 3 L12.6 8 L4.6 13 Z" />
+            </svg>
+          </button>
+          <button type="button" class="player-btn" id="music-next" aria-label="Saltear">
+            <svg viewBox="0 0 16 16" width="15" height="15" aria-hidden="true">
+              <path d="M3 3.2 L9.8 8 L3 12.8 Z" />
+              <path d="M10.8 3.2 V12.8" />
+            </svg>
+          </button>
+          <div class="now-playing-volume">
+            <button type="button" class="player-btn" id="music-volume" aria-label="Volumen" aria-expanded="false" aria-controls="now-playing-volume">
+              <svg class="icon-volume" viewBox="0 0 16 16" width="15" height="15" aria-hidden="true">
+                <path d="M2.8 6.15 H5 L8.15 3.55 V12.45 L5 9.85 H2.8 Z" />
+                <path d="M10.15 6.2 Q11.55 8 10.15 9.8" />
+                <path d="M11.55 4.7 Q13.7 8 11.55 11.3" />
+              </svg>
+              <svg class="icon-muted" viewBox="0 0 16 16" width="15" height="15" aria-hidden="true">
+                <path d="M2.8 6.15 H5 L8.15 3.55 V12.45 L5 9.85 H2.8 Z" />
+                <path d="M10.3 6.35 L13.15 9.2" />
+                <path d="M13.15 6.35 L10.3 9.2" />
+              </svg>
+            </button>
+            <div class="now-playing-slider-wrap">
+              <input
+                type="range"
+                class="now-playing-slider"
+                id="now-playing-volume"
+                min="0"
+                max="100"
+                value="40"
+                aria-label="Volumen"
+                aria-valuemin="0"
+                aria-valuemax="100"
+                aria-valuenow="40"
+              />
+            </div>
+          </div>
+        </div>
+      </div>
+    </aside>
+    <audio id="music-audio" preload="auto" hidden></audio>
+
+    <script type="module" src="app.js"></script>
+  </body>
+</html>
