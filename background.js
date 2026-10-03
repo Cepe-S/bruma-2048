@@ -134,7 +134,12 @@ export function createBrumaBackground(canvas, initialProfile = {}) {
     appearanceDuration: 500,
     pauseOnOutsideViewport: true,
     pixelRatio: profile.pixelRatio,
+    /** Caps shader redraws only; tile motion uses its own uncapped rAF loop. */
     targetFps: profile.targetFps,
+    webglContextAttributes: {
+      desynchronized: true,
+      powerPreference: profile.targetFps <= 20 ? "low-power" : "default",
+    },
     callbacks: {
       onReady() {
         ready = true;

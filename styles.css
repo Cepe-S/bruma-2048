@@ -2637,6 +2637,14 @@ body.is-quality-low .board.is-chain-pay {
   animation: none;
 }
 
+body.is-native-motion .tile:not(.is-pop):not(.is-spawn):not(.is-instant) {
+  transition: none;
+}
+
+body.is-native-motion .tile.is-sliding {
+  will-change: transform;
+}
+
 @media (max-width: 40rem) {
   .now-playing {
     width: min(15.5rem, calc(100vw - 1.4rem));

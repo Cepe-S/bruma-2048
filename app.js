@@ -22,6 +22,7 @@ import {
   undoLast,
 } from "./engine.js";
 import { createPerfPanel } from "./perf.js";
+import { animateDuration } from "./motion.js";
 import {
   applyQualityClass,
   createAutoDegrader,
@@ -31,6 +32,7 @@ import {
   readDegradedFlag,
   readQualityMode,
 } from "./quality.js";
+import { initRefreshRate } from "./refresh.js";
 import { formatSave, readSave } from "./save-text.js";
 import { MUSIC_ENABLED } from "./config.js";
 import { createMusicPlayer } from "./music.js";
@@ -280,6 +282,8 @@ let overlayMode = null;
 let overlayBeforeConfirm = null;
 let pointerOrigin = null;
 let moveTimer = 0;
+let cancelMoveAnim = null;
+let moveOrigins = null;
 let rumbleOn = readRumble();
 let comboGapMs = DEFAULT_COMBO_GAP_MS;
 let comboTimer = 0;
@@ -816,9 +820,60 @@ function maybeAnnounce() {
   }
 }
 
+function clearMoveAnimation() {
+  window.clearTimeout(moveTimer);
+  moveTimer = 0;
+  if (cancelMoveAnim) {
+    cancelMoveAnim();
+    cancelMoveAnim = null;
+  }
+  moveOrigins = null;
+  for (const node of tileNodes.values()) node.classList.remove("is-sliding");
+}
+
+function finishMoveTurn() {
+  clearMoveAnimation();
+  const mergedIds = new Set(state.tiles.filter((t) => t.merged).map((t) => t.id));
+  settle(state);
+  finishTurn(state);
+  const spawnIds = new Set(state.tiles.filter((t) => t.spawned).map((t) => t.id));
+  animating = false;
+  persistGame();
+  render({ poppingIds: mergedIds, spawnIds });
+  maybeAnnounce();
+}
+
+function beginMoveAnimation(origins) {
+  moveOrigins = origins;
+  for (const tile of state.tiles) {
+    const from = origins.get(tile.id);
+    if (!from || (from.r === tile.row && from.c === tile.col)) continue;
+    const node = tileNodes.get(tile.id);
+    if (!node) continue;
+    node.classList.add("is-sliding");
+    node.style.setProperty("--r", String(from.r));
+    node.style.setProperty("--c", String(from.c));
+  }
+  cancelMoveAnim = animateDuration({
+    durationMs: MOVE_MS,
+    onFrame(_now, _elapsed, t) {
+      for (const tile of state.tiles) {
+        const from = moveOrigins?.get(tile.id);
+        if (!from) continue;
+        if (from.r === tile.row && from.c === tile.col) continue;
+        const node = tileNodes.get(tile.id);
+        if (!node) continue;
+        node.style.setProperty("--r", String(from.r + (tile.row - from.r) * t));
+        node.style.setProperty("--c", String(from.c + (tile.col - from.c) * t));
+      }
+    },
+    onDone: finishMoveTurn,
+  });
+}
+
 function flushMoveIfAnimating() {
   if (!animating) return;
-  window.clearTimeout(moveTimer);
+  clearMoveAnimation();
   const mergedIds = new Set(state.tiles.filter((t) => t.merged).map((t) => t.id));
   settle(state);
   finishTurn(state);
@@ -832,7 +887,7 @@ function flushMoveIfAnimating() {
 
 function newGame() {
   hideOverlay();
-  window.clearTimeout(moveTimer);
+  clearMoveAnimation();
   animating = false;
   resetPadHold();
   clearCombo();
@@ -844,7 +899,7 @@ function newGame() {
 function applyUndo() {
   if (overlayMode === "confirm") return;
   if (animating) {
-    window.clearTimeout(moveTimer);
+    clearMoveAnimation();
     animating = false;
   }
   if (!undoLast(state)) {
@@ -936,6 +991,7 @@ function trapMenuTab(event) {
 
 function applyDirection(dir) {
   if (animating || overlayMode || menuOpen || saveDialog?.open) return;
+  const origins = new Map(state.tiles.map((t) => [t.id, { r: t.row, c: t.col }]));
   const before = snapshotPlayable(state);
   const result = move(state, dir);
   if (!result.moved) return;
@@ -950,16 +1006,11 @@ function applyDirection(dir) {
   brumaBg.nudge(dir);
   render();
 
-  moveTimer = window.setTimeout(() => {
-    const mergedIds = new Set(state.tiles.filter((t) => t.merged).map((t) => t.id));
-    settle(state);
-    finishTurn(state);
-    const spawnIds = new Set(state.tiles.filter((t) => t.spawned).map((t) => t.id));
-    animating = false;
-    persistGame();
-    render({ poppingIds: mergedIds, spawnIds });
-    maybeAnnounce();
-  }, MOVE_MS);
+  if (activeQuality.nativeMotion) {
+    beginMoveAnimation(origins);
+  } else {
+    moveTimer = window.setTimeout(finishMoveTurn, MOVE_MS);
+  }
 }
 
 function resetStateForSize(size) {
@@ -1242,6 +1293,7 @@ function boot() {
   paintCombo();
   buildGrid();
   syncBoardLayout();
+  initRefreshRate().then(() => perfPanel.refreshStatic());
   if (!MUSIC_ENABLED) {
     hideMusicUi();
   } else {
