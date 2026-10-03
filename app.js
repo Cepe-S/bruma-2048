@@ -21,6 +21,16 @@ import {
   startGame,
   undoLast,
 } from "./engine.js";
+import { createPerfPanel } from "./perf.js";
+import {
+  applyQualityClass,
+  createAutoDegrader,
+  persistDegradedFlag,
+  persistQualityMode,
+  qualityProfile,
+  readDegradedFlag,
+  readQualityMode,
+} from "./quality.js";
 import { formatSave, readSave } from "./save-text.js";
 import { MUSIC_ENABLED } from "./config.js";
 import { createMusicPlayer } from "./music.js";
@@ -92,6 +102,11 @@ const musicPrevBtn = document.getElementById("music-prev");
 const musicPauseBtn = document.getElementById("music-pause");
 const musicNextBtn = document.getElementById("music-next");
 const musicAudio = document.getElementById("music-audio");
+const qualitySwitchEl = document.getElementById("quality-switch");
+
+let qualityMode = readQualityMode();
+let qualityDegraded = readDegradedFlag();
+let activeQuality = qualityProfile(qualityMode, qualityDegraded);
 
 function bestKey(size) {
   return `bruma-2048-best-${size}`;
@@ -182,7 +197,67 @@ function restoreGame() {
 const state = createState(Math.random, readSize());
 state.best = readBest(state.size);
 
-const brumaBg = createBrumaBackground(document.getElementById("bruma-bg"));
+const brumaBg = createBrumaBackground(document.getElementById("bruma-bg"), activeQuality);
+applyQualityClass(activeQuality);
+
+function applyQuality(nextMode, { resetDegraded = false } = {}) {
+  qualityMode = nextMode;
+  if (resetDegraded || nextMode !== "auto") {
+    qualityDegraded = false;
+    persistDegradedFlag(false);
+  } else {
+    qualityDegraded = readDegradedFlag();
+  }
+  persistQualityMode(qualityMode);
+  activeQuality = qualityProfile(qualityMode, qualityDegraded);
+  applyQualityClass(activeQuality);
+  brumaBg.setQuality({
+    pixelRatio: activeQuality.pixelRatio,
+    targetFps: activeQuality.targetFps,
+    maxSegments: activeQuality.maxSegments,
+    mistBlurMax: activeQuality.mistBlurMax,
+  });
+  syncQualitySwitch();
+  if (qualityMode === "auto" && !qualityDegraded) autoDegrader.start();
+  else autoDegrader.stop();
+  perfPanel.refreshStatic();
+}
+
+function syncQualitySwitch() {
+  if (!qualitySwitchEl) return;
+  for (const btn of qualitySwitchEl.querySelectorAll("[data-quality]")) {
+    const active = btn.dataset.quality === qualityMode;
+    btn.setAttribute("aria-pressed", active ? "true" : "false");
+    btn.classList.toggle("is-on", active);
+  }
+}
+
+const perfPanel = createPerfPanel({
+  getCanvasInfo() {
+    const info = brumaBg.canvasInfo?.();
+    return {
+      dpr: window.devicePixelRatio || 1,
+      canvases: info ? [info] : [],
+    };
+  },
+});
+
+const autoDegrader = createAutoDegrader({
+  getMode: () => qualityMode,
+  onDegrade() {
+    qualityDegraded = true;
+    activeQuality = qualityProfile(qualityMode, true);
+    applyQualityClass(activeQuality);
+    brumaBg.setQuality({
+      pixelRatio: activeQuality.pixelRatio,
+      targetFps: activeQuality.targetFps,
+      maxSegments: activeQuality.maxSegments,
+      mistBlurMax: activeQuality.mistBlurMax,
+    });
+    syncQualitySwitch();
+    perfPanel.refreshStatic();
+  },
+});
 const music = createMusicPlayer({
   audioEl: musicAudio,
   coverEl: nowPlayingCover,
@@ -457,16 +532,17 @@ function burstBoard(count) {
   const power = comboBurst(count);
   if (power <= 0) return;
   const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  const scale = activeQuality.burstScale ?? 1;
   boardEl.style.setProperty("--burst", power.toFixed(3));
   boardEl.classList.add("is-burst");
   burstEl.hidden = false;
-  if (reduce) {
+  if (reduce || scale <= 0) {
     burstTimer = window.setTimeout(clearBurst, 160);
     return;
   }
-  const rings = power >= 0.72 ? 4 : power >= 0.4 ? 3 : 2;
-  const sparks = Math.round(6 + power * 18);
-  const shards = power < 0.34 ? 0 : Math.round((power - 0.22) * 12);
+  const rings = Math.max(1, Math.round((power >= 0.72 ? 4 : power >= 0.4 ? 3 : 2) * scale));
+  const sparks = Math.max(2, Math.round((6 + power * 18) * scale));
+  const shards = power < 0.34 ? 0 : Math.round((power - 0.22) * 12 * scale);
   for (let i = 0; i < rings; i++) {
     addBurstBit("burst-ring", power, {
       "--delay": `${i * 90}ms`,
@@ -1136,6 +1212,17 @@ function bindGamepad() {
   if (listGamepads().length > 0) startPadLoop();
 }
 
+function bindQualitySwitch() {
+  if (!qualitySwitchEl) return;
+  qualitySwitchEl.addEventListener("click", (event) => {
+    const btn = event.target.closest("[data-quality]");
+    if (!btn) return;
+    const next = btn.dataset.quality;
+    if (next === qualityMode) return;
+    applyQuality(next, { resetDegraded: true });
+  });
+}
+
 function bindSizeSwitch() {
   if (!sizeSwitchEl) return;
   sizeSwitchEl.addEventListener("click", (event) => {
@@ -1163,6 +1250,8 @@ function boot() {
       hideMusicUi();
     });
   }
+  syncQualitySwitch();
+  if (qualityMode === "auto" && !qualityDegraded) autoDegrader.start();
   if (restoreGame()) {
     remountBoard();
     maybeAnnounce();
@@ -1343,5 +1432,6 @@ boardEl.addEventListener("pointerup", onPointerUp);
 boardEl.addEventListener("pointercancel", onPointerCancel);
 boardEl.addEventListener("lostpointercapture", onPointerCancel);
 bindSizeSwitch();
+bindQualitySwitch();
 bindGamepad();
 boot();

@@ -25,6 +25,36 @@
 
     <button
       type="button"
+      class="perf-toggle"
+      id="perf-toggle"
+      aria-label="Rendimiento"
+      aria-expanded="false"
+      aria-controls="perf-panel"
+    >
+      <svg viewBox="0 0 16 16" width="16" height="16" aria-hidden="true">
+        <path d="M2.5 8h2.2l1.4-3.2 2.2 6.4 1.5-3.6h2.2" fill="none" stroke="currentColor" stroke-width="1.35" stroke-linecap="round" stroke-linejoin="round" />
+      </svg>
+    </button>
+
+    <aside class="perf-panel" id="perf-panel" hidden aria-hidden="true" aria-label="Métricas de rendimiento">
+      <header class="perf-head">
+        <strong>Rendimiento</strong>
+      </header>
+      <dl class="perf-grid">
+        <div><dt>FPS</dt><dd id="perf-fps">—</dd></div>
+        <div><dt>Prom</dt><dd id="perf-fps-avg">—</dd></div>
+        <div><dt>Frame</dt><dd id="perf-frame">—</dd></div>
+        <div><dt>Peor</dt><dd id="perf-worst">—</dd></div>
+        <div><dt>&gt;50 ms</dt><dd id="perf-jank">0</dd></div>
+        <div><dt>Mem</dt><dd id="perf-mem">—</dd></div>
+      </dl>
+      <p class="perf-meta"><span>DPR</span> <strong id="perf-dpr">—</strong></p>
+      <p class="perf-meta perf-meta--canvas"><span>Canvas</span> <strong id="perf-canvas">—</strong></p>
+      <canvas class="perf-graph" id="perf-graph" width="220" height="36" aria-hidden="true"></canvas>
+    </aside>
+
+    <button
+      type="button"
       class="menu-open"
       id="menu-open"
       aria-label="Menú"
@@ -133,6 +163,16 @@
             <h3>Mando</h3>
             <button type="button" class="toggle" id="rumble" aria-pressed="true">Vibración: sí</button>
             <p class="drawer-lead">Vibra al unir 512 o más.</p>
+          </section>
+
+          <section class="drawer-section">
+            <h3>Calidad</h3>
+            <p class="drawer-lead">Menos efectos en Baja mejora FPS en celular. Auto baja si el FPS cae.</p>
+            <div class="seg" id="quality-switch" role="group" aria-label="Calidad visual">
+              <button type="button" class="seg-btn" data-quality="high" aria-pressed="false">Alta</button>
+              <button type="button" class="seg-btn" data-quality="auto" aria-pressed="true">Auto</button>
+              <button type="button" class="seg-btn" data-quality="low" aria-pressed="false">Baja</button>
+            </div>
           </section>
         </div>
 
