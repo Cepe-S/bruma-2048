@@ -51,7 +51,7 @@ El repo está listo para GitHub Pages (sitio estático, sin build). La música v
 
 1. Subí el repo a GitHub.
 2. En **Settings → Pages**, elegí **Deploy from branch** → `main` → `/ (root)`.
-3. Abrí `https://<usuario>.github.io/bruma-2048/`.
+3. Abrí https://cepe-s.github.io/bruma-2048/
 
 ## Música (solo local)
 
