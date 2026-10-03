@@ -74,10 +74,16 @@ function mistFromState(state) {
   return Math.min(1, soft / cells);
 }
 
-export function createBrumaBackground(canvas) {
+export function createBrumaBackground(canvas, initialProfile = {}) {
   const shift = canvas.parentElement;
   const motion = window.matchMedia("(prefers-reduced-motion: reduce)");
   const gradient = new MeshGradient();
+  let profile = {
+    pixelRatio: initialProfile.pixelRatio ?? Math.min(window.devicePixelRatio || 1, 2),
+    targetFps: initialProfile.targetFps ?? 30,
+    maxSegments: initialProfile.maxSegments,
+    mistBlurMax: initialProfile.mistBlurMax ?? MIST_BLUR,
+  };
   let ready = false;
   let shown = 0;
   let target = 0;
@@ -99,8 +105,25 @@ export function createBrumaBackground(canvas) {
   let nudgeLast = 0;
   let lastColor = "";
   let reduced = motion.matches;
+  let hidden = document.hidden;
 
-  gradient.init(canvas, {
+  function onVisibility() {
+    hidden = document.hidden;
+    if (hidden) {
+      if (colorRaf) {
+        cancelAnimationFrame(colorRaf);
+        colorRaf = 0;
+      }
+      if (nudgeRaf) {
+        cancelAnimationFrame(nudgeRaf);
+        nudgeRaf = 0;
+      }
+    }
+  }
+
+  document.addEventListener("visibilitychange", onVisibility);
+
+  const initOpts = {
     colors: paletteAt(0),
     seed: 8,
     animationSpeed: 0.16,
@@ -110,13 +133,18 @@ export function createBrumaBackground(canvas) {
     appearance: "smooth",
     appearanceDuration: 500,
     pauseOnOutsideViewport: true,
+    pixelRatio: profile.pixelRatio,
+    targetFps: profile.targetFps,
     callbacks: {
       onReady() {
         ready = true;
         paintColors();
       },
     },
-  });
+  };
+  if (profile.maxSegments) initOpts.maxSegments = profile.maxSegments;
+
+  gradient.init(canvas, initOpts);
 
   function paintColors() {
     if (!ready) return;
@@ -135,13 +163,18 @@ export function createBrumaBackground(canvas) {
   }
 
   function applyBlur() {
-    const px = mist * mist * MIST_BLUR;
+    const cap = profile.mistBlurMax ?? MIST_BLUR;
+    const px = cap <= 0 ? 0 : mist * mist * cap;
     if (Math.abs(px - lastBlur) < 0.2) return;
     lastBlur = px;
     canvas.style.filter = px < 0.4 ? "" : `blur(${px.toFixed(1)}px)`;
   }
 
   function easeColors(now = performance.now()) {
+    if (hidden) {
+      colorRaf = 0;
+      return;
+    }
     const prev = easeColors.last ?? now;
     const dt = Math.min(0.05, (now - prev) / 1000);
     easeColors.last = now;
@@ -178,12 +211,16 @@ export function createBrumaBackground(canvas) {
   }
 
   function wakeColors() {
-    if (colorRaf) return;
+    if (colorRaf || hidden) return;
     easeColors.last = performance.now();
     colorRaf = window.requestAnimationFrame(easeColors);
   }
 
   function settleNudge(now) {
+    if (hidden) {
+      nudgeRaf = 0;
+      return;
+    }
     const dt = Math.min(0.05, (now - nudgeLast) / 1000);
     nudgeLast = now;
     if (now >= holdUntil) {
@@ -213,7 +250,36 @@ export function createBrumaBackground(canvas) {
 
   motion.addEventListener("change", onMotion);
 
+  function setQuality(nextProfile) {
+    profile = {
+      ...profile,
+      ...nextProfile,
+    };
+    applyBlur();
+    if (!ready) return;
+    const patch = {
+      transition: false,
+      pixelRatio: profile.pixelRatio,
+      targetFps: profile.targetFps,
+    };
+    if (profile.maxSegments) patch.maxSegments = profile.maxSegments;
+    gradient.update(patch);
+  }
+
+  function canvasInfo() {
+    const rect = canvas.getBoundingClientRect();
+    return {
+      label: "bruma-bg",
+      cssW: Math.round(rect.width),
+      cssH: Math.round(rect.height),
+      bufW: canvas.width,
+      bufH: canvas.height,
+    };
+  }
+
   return {
+    setQuality,
+    canvasInfo,
     sync(state) {
       target = difficultyFromState(state);
       mistTarget = mistFromState(state);
@@ -246,6 +312,7 @@ export function createBrumaBackground(canvas) {
     destroy() {
       window.cancelAnimationFrame(colorRaf);
       window.cancelAnimationFrame(nudgeRaf);
+      document.removeEventListener("visibilitychange", onVisibility);
       motion.removeEventListener("change", onMotion);
       gradient.destroy();
     },
